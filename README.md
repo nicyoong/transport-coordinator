@@ -1,6 +1,4 @@
-Here’s a ready-to-paste `README.md`.
-
-````markdown id="3n3yq1"
+````
 # Transport Planner
 
 A Python transport coordination tool for proposing car assignments and route plans.
