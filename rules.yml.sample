@@ -1,0 +1,12 @@
+same_gender_only: true
+
+must_together:
+  - [Alice, Bella]
+
+cannot_pair:
+  - [John, Mark]
+
+preferred_driver:
+  Alice: Sarah
+
+unavailable_drivers: []

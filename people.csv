@@ -1,0 +1,9 @@
+name,gender,home_address,can_drive,car_capacity
+Sarah,F,"Sarah full address",true,4
+Maya,F,"Maya full address",true,3
+Alice,F,"Alice full address",false,0
+Bella,F,"Bella full address",false,0
+Nina,F,"Nina full address",false,0
+Daniel,M,"Daniel full address",true,4
+John,M,"John full address",false,0
+Mark,M,"Mark full address",false,0

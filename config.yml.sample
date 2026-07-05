@@ -1,0 +1,18 @@
+google_maps_api_key: "YOUR_GOOGLE_MAPS_API_KEY"
+
+trip:
+  type: "single_place"
+  places:
+    - "Lunch Restaurant"
+
+# For multiple places:
+# trip:
+#   type: "multiple_places"
+#   places:
+#     - "Lunch Restaurant"
+#     - "Mall"
+
+settings:
+  max_passengers_per_car: 4
+  outside_penalty_minutes: 10000
+  preferred_driver_bonus_minutes: 20
