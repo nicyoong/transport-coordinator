@@ -1,9 +1,21 @@
 name,gender,home_address,can_drive,car_capacity
-Sarah,F,"Sarah full address",true,4
-Maya,F,"Maya full address",true,3
-Alice,F,"Alice full address",false,0
-Bella,F,"Bella full address",false,0
-Nina,F,"Nina full address",false,0
-Daniel,M,"Daniel full address",true,4
-John,M,"John full address",false,0
-Mark,M,"Mark full address",false,0
+Olivia,F,"Beta KL, Cormar Suites, No. 10, Jalan Perak, 50450 Kuala Lumpur",true,4
+Emma,F,"Yun House, Four Seasons Hotel Kuala Lumpur, 145 Jalan Ampang, 50450 Kuala Lumpur",true,4
+Sophia,F,"Shang Palace, Shangri-La Kuala Lumpur, 11 Jalan Sultan Ismail, 50250 Kuala Lumpur",true,3
+Charlotte,F,"FLOCK, W Kuala Lumpur, 121 Jalan Ampang, 50450 Kuala Lumpur",false,0
+Amelia,F,"Curate, Four Seasons Hotel Kuala Lumpur, 145 Jalan Ampang, 50450 Kuala Lumpur",false,0
+Isabella,F,"Tatsu Japanese Cuisine, InterContinental Kuala Lumpur, 165 Jalan Ampang, 50450 Kuala Lumpur",false,0
+Mia,F,"Serena Brasserie, InterContinental Kuala Lumpur, 165 Jalan Ampang, 50450 Kuala Lumpur",false,0
+Evelyn,F,"Zipangu, Shangri-La Kuala Lumpur, 11 Jalan Sultan Ismail, 50250 Kuala Lumpur",false,0
+Harper,F,"Arthur's Bar & Grill, Shangri-La Kuala Lumpur, 11 Jalan Sultan Ismail, 50250 Kuala Lumpur",false,0
+Luna,F,"Kin Kin Restaurant, 40 Jalan Dewan Sultan Sulaiman, Kampung Baru, 50300 Kuala Lumpur",false,0
+Noah,M,"Village Park Restaurant, 5 Jalan SS 21/37, Damansara Utama, 47400 Petaling Jaya",true,4
+Liam,M,"Fatty Crab Restaurant, 2 Jalan SS 24/13, Taman Megah, 47301 Petaling Jaya",true,4
+Ethan,M,"myBurgerLab Seapark, 14 Jalan 21/22, Sea Park, 46300 Petaling Jaya",true,3
+Oliver,M,"Antipodean Atria, Atria Shopping Gallery, Jalan SS 22/23, Damansara Jaya, 47400 Petaling Jaya",false,0
+James,M,"Strangers at 47, 45 Jalan 17/45, Seksyen 17, 46400 Petaling Jaya",false,0
+William,M,"Annie 1 Family Restaurant, 20 Jalan SS 21/58, Damansara Utama, 47400 Petaling Jaya",false,0
+Benjamin,M,"Toh Yuen Chinese Restaurant, Hilton Petaling Jaya, 2 Jalan Barat, 46200 Petaling Jaya",false,0
+Lucas,M,"Chime, Sheraton Petaling Jaya Hotel, Jalan Utara C, 46200 Petaling Jaya",false,0
+Henry,M,"Sala Bar, Sheraton Petaling Jaya Hotel, Jalan Utara C, 46200 Petaling Jaya",false,0
+Alexander,M,"Yue, Sheraton Petaling Jaya Hotel, Jalan Utara C, 46200 Petaling Jaya",false,0

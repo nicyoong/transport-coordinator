@@ -1,10 +1,18 @@
 import json
 import yaml
 import pandas as pd
+import os
+from dotenv import load_dotenv
 
 from google_routes_client import GoogleRoutesClient
 from transport_planner import plan_transport
 
+load_dotenv()
+
+google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+
+if not google_maps_api_key:
+    raise ValueError("Missing GOOGLE_MAPS_API_KEY in .env file.")
 
 def parse_bool(value):
     if isinstance(value, bool):
@@ -79,7 +87,7 @@ def main():
     addresses = collect_addresses(people, places)
 
     routes_client = GoogleRoutesClient(
-        api_key=config["google_maps_api_key"]
+        api_key=google_maps_api_key
     )
 
     duration_matrix = routes_client.compute_duration_matrix(addresses)

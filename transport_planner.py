@@ -360,6 +360,10 @@ def plan_transport(
     outside_penalty_minutes: int = 10000,
     preferred_driver_bonus_minutes: int = 20,
 ) -> dict:
+
+    if trip_type not in {"single_place", "multiple_places"}:
+        raise ValueError(f"Unknown trip_type: {trip_type}")
+    
     unavailable = set(rules.get("unavailable_drivers", []))
 
     drivers = [
