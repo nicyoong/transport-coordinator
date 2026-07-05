@@ -1,4 +1,3 @@
-````
 # Transport Planner
 
 A Python transport coordination tool for proposing car assignments and route plans.
@@ -485,5 +484,3 @@ Possible next steps:
 * add “must be in same car as driver” rules
 * add “avoid tolls” or “avoid highways” settings
 
-```
-```
