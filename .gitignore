@@ -219,3 +219,13 @@ __marimo__/
 
 # YML
 *.yml
+
+# Local API usage databases
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+
+# Generated planner input and output
+*.csv
+transport_plan*.json
+transport_plan*.csv

@@ -6,6 +6,7 @@ from transport_planner import (
     group_is_valid,
     evaluate_single_place_trip,
     evaluate_multiple_places_trip,
+    option_cost,
     build_car_options,
     choose_best_options_ortools,
     plan_transport,
@@ -304,6 +305,7 @@ def test_plan_transport_single_place(sample_people, sample_places, sample_rules,
     )
 
     assert result["trip_type"] == "single_place"
+    assert result["duty"] == "both"
     assert result["summary"]["total_people"] == 8
     assert result["summary"]["total_drivers_available"] == 3
     assert result["summary"]["total_passengers"] == 5
@@ -311,6 +313,50 @@ def test_plan_transport_single_place(sample_people, sample_places, sample_rules,
     assert "cars" in result
     assert "outside_due_to_no_space" in result
     assert "warnings" in result
+
+
+@pytest.mark.parametrize(
+    ("duty", "expected_cost"),
+    [
+        ("pickup", 12),
+        ("dropoff", 25),
+        ("both", 37),
+    ],
+)
+def test_option_cost_uses_selected_duty(duty, expected_cost):
+    trip = {
+        "pickup_path": {"estimated_duration_min": 12},
+        "dropoff_path": {"estimated_duration_min": 25},
+        "total_estimated_duration_min": 37,
+    }
+
+    assert option_cost(
+        trip=trip,
+        driver={"name": "Sarah"},
+        group=(),
+        rules={},
+        preferred_driver_bonus_minutes=20,
+        duty=duty,
+    ) == expected_cost
+
+
+def test_plan_transport_records_selected_duty(
+    sample_people,
+    sample_places,
+    sample_rules,
+    sample_duration_matrix,
+):
+    result = plan_transport(
+        people=sample_people,
+        places=[sample_places[0]],
+        rules=sample_rules,
+        trip_type="single_place",
+        duration_matrix=sample_duration_matrix,
+        duty="pickup",
+    )
+
+    assert result["duty"] == "pickup"
+    assert any("pickup duty" in warning for warning in result["warnings"])
 
 
 def test_plan_transport_multiple_places(sample_people, sample_places, sample_rules, sample_duration_matrix):

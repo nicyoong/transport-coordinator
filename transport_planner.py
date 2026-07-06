@@ -196,8 +196,16 @@ def option_cost(
     group: Tuple[dict, ...],
     rules: dict,
     preferred_driver_bonus_minutes: int,
+    duty: str = "both",
 ) -> int:
-    cost = trip["total_estimated_duration_min"]
+    if duty == "pickup":
+        cost = trip["pickup_path"]["estimated_duration_min"]
+    elif duty == "dropoff":
+        cost = trip["dropoff_path"]["estimated_duration_min"]
+    elif duty == "both":
+        cost = trip["total_estimated_duration_min"]
+    else:
+        raise ValueError(f"Unknown duty: {duty}")
 
     preferred_driver = rules.get("preferred_driver", {})
 
@@ -219,6 +227,7 @@ def build_car_options(
     rules: dict,
     max_passengers_per_car: int,
     preferred_driver_bonus_minutes: int,
+    duty: str = "both",
 ) -> List[dict]:
     options = []
 
@@ -262,6 +271,7 @@ def build_car_options(
                         group=group,
                         rules=rules,
                         preferred_driver_bonus_minutes=preferred_driver_bonus_minutes,
+                        duty=duty,
                     ),
                     "trip": trip,
                 }
@@ -359,10 +369,14 @@ def plan_transport(
     max_passengers_per_car: int = 4,
     outside_penalty_minutes: int = 10000,
     preferred_driver_bonus_minutes: int = 20,
+    duty: str = "both",
 ) -> dict:
 
     if trip_type not in {"single_place", "multiple_places"}:
         raise ValueError(f"Unknown trip_type: {trip_type}")
+
+    if duty not in {"pickup", "dropoff", "both"}:
+        raise ValueError(f"Unknown duty: {duty}")
     
     unavailable = set(rules.get("unavailable_drivers", []))
 
@@ -385,6 +399,7 @@ def plan_transport(
         rules=rules,
         max_passengers_per_car=max_passengers_per_car,
         preferred_driver_bonus_minutes=preferred_driver_bonus_minutes,
+        duty=duty,
     )
 
     selected_options, outside = choose_best_options_ortools(
@@ -405,7 +420,7 @@ def plan_transport(
 
     warnings = [
         "This is only a proposed arrangement.",
-        "Pickup route is optimized separately from drop-off route.",
+        f"Assignments and route costs are optimized for {duty} duty.",
         "Passengers may be outside if there is insufficient valid car space.",
     ]
 
@@ -416,6 +431,7 @@ def plan_transport(
 
     return {
         "trip_type": trip_type,
+        "duty": duty,
         "summary": {
             "total_people": len(people),
             "total_drivers_available": len(drivers),

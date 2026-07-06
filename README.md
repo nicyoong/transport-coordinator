@@ -59,8 +59,8 @@ transport_planner/
 ├── google_routes_client.py
 ├── people.csv
 ├── places.csv
-├── rules.yaml
-├── config.yaml
+├── rules.yml
+├── config.yml
 ├── .env
 ├── requirements.txt
 └── tests/
@@ -115,7 +115,7 @@ pip install -r requirements.txt
 
 ## Environment Variables
 
-The Google Maps API key should be stored in `.env`, not in `config.yaml`.
+The Google Maps API key should be stored in `.env`, not in `config.yml`.
 
 Create a `.env` file:
 
@@ -182,12 +182,12 @@ Fields:
 
 | Field     | Meaning                                |
 | --------- | -------------------------------------- |
-| `name`    | Short name used in `config.yaml`       |
+| `name`    | Short name used in `config.yml`        |
 | `address` | Full address sent to Google Routes API |
 
 ---
 
-### `rules.yaml`
+### `rules.yml`
 
 This file stores pairing rules and exceptions.
 
@@ -238,7 +238,7 @@ Then run the planner again.
 
 ---
 
-### `config.yaml`
+### `config.yml`
 
 For a single-place trip:
 
@@ -252,6 +252,10 @@ settings:
   max_passengers_per_car: 4
   outside_penalty_minutes: 10000
   preferred_driver_bonus_minutes: 20
+  routes_usage_database: "routes_usage.sqlite3"
+  routes_matrix_element_limit_30_days: 10000
+  output_json_path: "transport_plan_{duty}.json"
+  output_csv_path: "transport_plan_{duty}.csv"
 ```
 
 For a multiple-place trip:
@@ -268,6 +272,10 @@ settings:
   max_passengers_per_car: 4
   outside_penalty_minutes: 10000
   preferred_driver_bonus_minutes: 20
+  routes_usage_database: "routes_usage.sqlite3"
+  routes_matrix_element_limit_30_days: 10000
+  output_json_path: "transport_plan_{duty}.json"
+  output_csv_path: "transport_plan_{duty}.csv"
 ```
 
 Settings:
@@ -277,6 +285,10 @@ Settings:
 | `max_passengers_per_car`         | Hard maximum passenger seats per car        |
 | `outside_penalty_minutes`        | Penalty for leaving a passenger outside     |
 | `preferred_driver_bonus_minutes` | Bonus applied when preferred driver is used |
+| `routes_usage_database`          | Local SQLite API usage ledger               |
+| `routes_matrix_element_limit_30_days` | Maximum matrix elements allowed in any rolling 30-day window |
+| `output_json_path`               | Raw JSON path; `{duty}` becomes the selected duty |
+| `output_csv_path`                | Driver/passenger CSV path; `{duty}` becomes the selected duty |
 
 A high outside penalty makes the system try hard to assign everyone.
 
@@ -284,13 +296,107 @@ A high outside penalty makes the system try hard to assign everyone.
 
 ## Running the Planner
 
-Run:
+Run one duty:
 
 ```bash
-python main.py
+python main.py pickup
+python main.py dropoff
 ```
 
-The output is printed as JSON.
+To optimize both duties together:
+
+```bash
+python main.py both
+```
+
+Running `python main.py` without an argument also defaults to `both`.
+
+Show command help with any of:
+
+```bash
+python main.py help
+python main.py --help
+python main.py -h
+```
+
+Pickup and drop-off modes optimize driver assignments using only the selected
+duty's travel time and print only that route. Both mode uses the combined
+travel time. The terminal report shows only each car, driver, passenger order,
+total estimated driving time, unused drivers, unassigned passengers, and
+notes. Addresses and API usage remain in the raw JSON.
+
+The complete raw result is written to `transport_plan_pickup.json`,
+`transport_plan_dropoff.json`, or `transport_plan_both.json`. Separate files
+prevent one duty's result from overwriting another.
+
+A spreadsheet-friendly CSV is also written for each duty:
+`transport_plan_pickup.csv`, `transport_plan_dropoff.csv`, or
+`transport_plan_both.csv`. Cell A1 contains `Driver`; driver names occupy B1
+onward, and their passengers are listed downward in optimized duty order.
+Unused drivers retain an empty column. Combined mode uses pickup order because
+a single CSV column can represent only one passenger sequence.
+
+### Routes API usage guard
+
+Every planned Compute Route Matrix request is recorded in the local SQLite
+database before it is sent. Billing is based on matrix elements, calculated as
+origins multiplied by destinations, so the rolling limit is enforced on
+elements rather than HTTP requests. If a complete calculation would exceed the
+limit, no request from that calculation is sent.
+
+Usage is stored and limited separately by the API key's last six characters.
+The complete API key is never written to the database. Changing the key starts
+a separate rolling usage allowance.
+
+The planner output includes `routes_api_usage_30_days`. You can also inspect
+usage without calling Google:
+
+```bash
+python routes_usage.py
+```
+
+This defaults to the current `GOOGLE_MAPS_API_KEY` in `.env`. To inspect a
+specific stored key suffix:
+
+```bash
+python routes_usage.py --api-key-last6 abc123
+```
+
+Show database command help with:
+
+```bash
+python routes_usage.py help
+python routes_usage.py --help
+python routes_usage.py -h
+```
+
+Failed API attempts remain counted conservatively because they may have reached
+Google. The database and its journal files are excluded from Git. Keep a Google
+Cloud quota configured as a second, server-side safeguard.
+
+### Geocoding fixed test locations
+
+Enable the **Geocoding API** in the same Google Cloud project used for the
+Routes API. The existing `GOOGLE_MAPS_API_KEY` can be used if its API
+restrictions allow both APIs.
+
+Generate coordinates and Place IDs for the unique addresses in `people.csv`
+and `places.csv`:
+
+```bash
+python geocode_locations.py
+```
+
+This writes `locations.csv`. Existing complete rows are reused, so subsequent
+runs only request new or incomplete addresses. To geocode every address again:
+
+```bash
+python geocode_locations.py --refresh
+```
+
+Review rows where `partial_match` is `True` or where `location_type` is less
+precise than expected. The API key is read from `.env` and is never written to
+the output.
 
 Example output:
 

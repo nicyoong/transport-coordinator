@@ -1,16 +1,20 @@
 trip:
   type: "single_place"
   places:
-    - "Lunch Restaurant"
+    - "Beta KL"
 
 # For multiple places:
 # trip:
 #   type: "multiple_places"
 #   places:
-#     - "Lunch Restaurant"
-#     - "Mall"
+#     - "Beta KL"
+#     - "Yun House"
 
 settings:
   max_passengers_per_car: 4
   outside_penalty_minutes: 10000
   preferred_driver_bonus_minutes: 20
+  routes_usage_database: "routes_usage.sqlite3"
+  routes_matrix_element_limit_30_days: 10000
+  output_json_path: "transport_plan_{duty}.json"
+  output_csv_path: "transport_plan_{duty}.csv"
