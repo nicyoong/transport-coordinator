@@ -21,7 +21,6 @@ def sample_result():
         "places": [
             {
                 "name": "Office",
-                "address": "3 Destination Road",
             }
         ],
         "cars": [
@@ -30,17 +29,17 @@ def sample_result():
                 "passengers": ["Alice"],
                 "pickup_path": {
                     "route": [
-                        "1 Driver Road",
-                        "2 Passenger Road",
-                        "3 Destination Road",
+                        "home:sarah",
+                        "home:alice",
+                        "place:office",
                     ],
                     "estimated_duration_min": 12,
                 },
                 "dropoff_path": {
                     "route": [
-                        "3 Destination Road",
-                        "2 Passenger Road",
-                        "1 Driver Road",
+                        "place:office",
+                        "home:alice",
+                        "home:sarah",
                     ],
                     "estimated_duration_min": 13,
                 },
@@ -67,17 +66,17 @@ def sample_people():
     return [
         {
             "name": "Sarah",
-            "home_address": "1 Driver Road",
+            "home_location_id": "home:sarah",
             "can_drive": True,
         },
         {
             "name": "Alice",
-            "home_address": "2 Passenger Road",
+            "home_location_id": "home:alice",
             "can_drive": False,
         },
         {
             "name": "John",
-            "home_address": "4 Unused Road",
+            "home_location_id": "home:john",
             "can_drive": True,
         },
     ]
@@ -150,16 +149,16 @@ def test_format_transport_plan_uses_optimized_passenger_order():
     result["duty"] = "pickup"
     result["cars"][0]["passengers"] = ["Alice", "Bella"]
     result["cars"][0]["pickup_path"]["route"] = [
-        "1 Driver Road",
-        "5 Bella Road",
-        "2 Passenger Road",
-        "3 Destination Road",
+        "home:sarah",
+        "home:bella",
+        "home:alice",
+        "place:office",
     ]
     people = [
         *sample_people(),
         {
             "name": "Bella",
-            "home_address": "5 Bella Road",
+            "home_location_id": "home:bella",
             "can_drive": False,
         },
     ]
@@ -174,16 +173,16 @@ def test_write_csv_result_uses_dropoff_order(tmp_path):
     result["duty"] = "dropoff"
     result["cars"][0]["passengers"] = ["Alice", "Bella"]
     result["cars"][0]["dropoff_path"]["route"] = [
-        "3 Destination Road",
-        "5 Bella Road",
-        "2 Passenger Road",
-        "1 Driver Road",
+        "place:office",
+        "home:bella",
+        "home:alice",
+        "home:sarah",
     ]
     people = [
         *sample_people(),
         {
             "name": "Bella",
-            "home_address": "5 Bella Road",
+            "home_location_id": "home:bella",
             "can_drive": False,
         },
     ]

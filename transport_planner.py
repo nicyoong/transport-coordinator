@@ -96,19 +96,22 @@ def evaluate_single_place_trip(
     place: dict,
     duration_matrix: Dict[Tuple[str, str], int],
 ) -> dict:
-    driver_home = driver["home_address"]
-    passenger_homes = [passenger["home_address"] for passenger in passengers]
-    place_address = place["address"]
+    driver_home = driver["home_location_id"]
+    passenger_homes = [
+        passenger["home_location_id"]
+        for passenger in passengers
+    ]
+    place_location = place["location_id"]
 
     pickup_route, pickup_duration = best_ordered_route(
         start=driver_home,
         stops=passenger_homes,
-        end=place_address,
+        end=place_location,
         duration_matrix=duration_matrix,
     )
 
     dropoff_route, dropoff_duration = best_ordered_route(
-        start=place_address,
+        start=place_location,
         stops=passenger_homes,
         end=driver_home,
         duration_matrix=duration_matrix,
@@ -139,12 +142,15 @@ def evaluate_multiple_places_trip(
     places: List[dict],
     duration_matrix: Dict[Tuple[str, str], int],
 ) -> dict:
-    driver_home = driver["home_address"]
-    passenger_homes = [passenger["home_address"] for passenger in passengers]
+    driver_home = driver["home_location_id"]
+    passenger_homes = [
+        passenger["home_location_id"]
+        for passenger in passengers
+    ]
 
-    place_addresses = [place["address"] for place in places]
-    first_place = place_addresses[0]
-    final_place = place_addresses[-1]
+    place_locations = [place["location_id"] for place in places]
+    first_place = place_locations[0]
+    final_place = place_locations[-1]
 
     pickup_route, pickup_duration = best_ordered_route(
         start=driver_home,
@@ -153,7 +159,7 @@ def evaluate_multiple_places_trip(
         duration_matrix=duration_matrix,
     )
 
-    place_to_place_route = place_addresses
+    place_to_place_route = place_locations
     place_to_place_duration = route_duration(
         place_to_place_route,
         duration_matrix,
@@ -439,7 +445,10 @@ def plan_transport(
             "total_passengers_assigned": len(passengers) - len(outside),
             "total_passengers_outside": len(outside),
         },
-        "places": places,
+        "places": [
+            {"name": place["name"]}
+            for place in places
+        ],
         "cars": cars,
         "outside_due_to_no_space": outside_due_to_no_space,
         "warnings": warnings,

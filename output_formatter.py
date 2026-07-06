@@ -17,15 +17,15 @@ def passengers_in_route_order(
     people: list[dict],
 ) -> list[str]:
     people_by_name = {person["name"]: person for person in people}
-    names_by_address: dict[str, list[str]] = {}
+    names_by_location_id: dict[str, list[str]] = {}
 
     for name in car["passengers"]:
-        address = people_by_name[name]["home_address"]
-        names_by_address.setdefault(address, []).append(name)
+        location_id = people_by_name[name]["home_location_id"]
+        names_by_location_id.setdefault(location_id, []).append(name)
 
     ordered_names = []
-    for address in path["route"][1:-1]:
-        names = names_by_address.get(address, [])
+    for location_id in path["route"][1:-1]:
+        names = names_by_location_id.get(location_id, [])
         if names:
             ordered_names.append(names.pop(0))
 

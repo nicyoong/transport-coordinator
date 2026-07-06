@@ -33,12 +33,19 @@ def computed_routes_response(*args, **kwargs):
     return response
 
 
+def private_locations(count):
+    return {
+        f"location:{index}": f"Private Address {index}"
+        for index in range(count)
+    }
+
+
 def test_compute_duration_matrix_allows_exactly_625_elements(monkeypatch):
     post = Mock(return_value=mock_routes_response())
     monkeypatch.setattr("google_routes_client.requests.post", post)
-    addresses = [f"Address {index}" for index in range(25)]
+    locations = private_locations(25)
 
-    GoogleRoutesClient("test-key").compute_duration_matrix(addresses)
+    GoogleRoutesClient("test-key").compute_duration_matrix(locations)
 
     post.assert_called_once()
     payload = post.call_args.kwargs["json"]
@@ -51,15 +58,15 @@ def test_compute_duration_matrix_batches_and_merges_more_than_625_elements(
 ):
     post = Mock(side_effect=computed_routes_response)
     monkeypatch.setattr("google_routes_client.requests.post", post)
-    addresses = [f"Address {index}" for index in range(26)]
+    locations = private_locations(26)
 
-    matrix = GoogleRoutesClient("test-key").compute_duration_matrix(addresses)
+    matrix = GoogleRoutesClient("test-key").compute_duration_matrix(locations)
 
     assert post.call_count == 4
     assert len(matrix) == 26 * 26
-    assert matrix[("Address 0", "Address 25")] == 60
-    assert matrix[("Address 25", "Address 0")] == 60
-    assert matrix[("Address 25", "Address 25")] == 0
+    assert matrix[("location:0", "location:25")] == 60
+    assert matrix[("location:25", "location:0")] == 60
+    assert matrix[("location:25", "location:25")] == 0
 
     for call in post.call_args_list:
         payload = call.kwargs["json"]
@@ -69,17 +76,19 @@ def test_compute_duration_matrix_batches_and_merges_more_than_625_elements(
         assert element_count <= GoogleRoutesClient.MAX_MATRIX_ELEMENTS
 
 
-def test_compute_duration_matrix_counts_only_unique_addresses(monkeypatch):
+def test_compute_duration_matrix_sends_addresses_but_keys_by_location_id(
+    monkeypatch,
+):
     post = Mock(return_value=mock_routes_response())
     monkeypatch.setattr("google_routes_client.requests.post", post)
-    unique_addresses = [f"Address {index}" for index in range(25)]
-    addresses = [*unique_addresses, *unique_addresses]
+    locations = private_locations(25)
 
-    GoogleRoutesClient("test-key").compute_duration_matrix(addresses)
+    GoogleRoutesClient("test-key").compute_duration_matrix(locations)
 
     payload = post.call_args.kwargs["json"]
     assert len(payload["origins"]) == 25
     assert len(payload["destinations"]) == 25
+    assert payload["origins"][0]["waypoint"]["address"] == "Private Address 0"
 
 
 @pytest.mark.parametrize(
@@ -120,7 +129,7 @@ def test_compute_duration_matrix_records_usage(monkeypatch, tmp_path):
         "test-key",
         usage_store=store,
         matrix_element_limit_30_days=100,
-    ).compute_duration_matrix(["Address 1", "Address 2"])
+    ).compute_duration_matrix(private_locations(2))
 
     assert store.get_usage_summary() == {
         "window_days": 30,
@@ -142,14 +151,14 @@ def test_compute_duration_matrix_blocks_all_batches_before_api_call(
     post = Mock(side_effect=computed_routes_response)
     monkeypatch.setattr("google_routes_client.requests.post", post)
     store = RoutesUsageStore(tmp_path / "usage.sqlite3")
-    addresses = [f"Address {index}" for index in range(26)]
+    locations = private_locations(26)
 
     with pytest.raises(RoutesUsageLimitError, match=r"676 requested > 650"):
         GoogleRoutesClient(
             "test-key",
             usage_store=store,
             matrix_element_limit_30_days=650,
-        ).compute_duration_matrix(addresses)
+        ).compute_duration_matrix(locations)
 
     post.assert_not_called()
     assert store.get_usage_summary()["request_count"] == 0
@@ -166,7 +175,7 @@ def test_compute_duration_matrix_records_failed_attempt(monkeypatch, tmp_path):
         GoogleRoutesClient(
             "test-key",
             usage_store=store,
-        ).compute_duration_matrix(["Address 1", "Address 2"])
+        ).compute_duration_matrix(private_locations(2))
 
     summary = store.get_usage_summary()
     assert summary["matrix_element_count"] == 4

@@ -1,0 +1,4 @@
+location_id,address
+loc_001,"Full private driver address"
+loc_002,"Full private passenger address"
+loc_003,"Full destination address"
