@@ -15,6 +15,7 @@ class GoogleGeocodingClient:
 
     def geocode(
         self,
+        location_id: str,
         address: str,
         region_code: Optional[str] = "my",
     ) -> Dict[str, Any]:
@@ -26,38 +27,41 @@ class GoogleGeocodingClient:
         if region_code:
             params["region"] = region_code
 
-        response = requests.get(
-            self.GEOCODING_URL,
-            params=params,
-            timeout=30,
-        )
-        response.raise_for_status()
+        try:
+            response = requests.get(
+                self.GEOCODING_URL,
+                params=params,
+                timeout=30,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            raise GeocodingError(
+                f"Could not geocode location {location_id!r}: "
+                "Google request failed."
+            ) from None
+
         data = response.json()
         status = data.get("status")
 
         if status != "OK":
-            detail = data.get("error_message", "No additional details.")
             raise GeocodingError(
-                f"Could not geocode {address!r}: {status}. {detail}"
+                f"Could not geocode location {location_id!r}: "
+                f"Google returned {status!r}."
             )
 
         results = data.get("results", [])
 
         if not results:
             raise GeocodingError(
-                f"Could not geocode {address!r}: response had no results."
+                f"Could not geocode location {location_id!r}: "
+                "response had no results."
             )
 
         result = results[0]
         geometry = result["geometry"]
-        location = geometry["location"]
 
         return {
-            "address": address,
-            "formatted_address": result.get("formatted_address", ""),
-            "latitude": location["lat"],
-            "longitude": location["lng"],
-            "place_id": result.get("place_id", ""),
+            "location_id": location_id,
             "location_type": geometry.get("location_type", ""),
             "partial_match": bool(result.get("partial_match", False)),
         }

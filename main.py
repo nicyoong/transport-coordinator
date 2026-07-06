@@ -10,6 +10,7 @@ from output_formatter import (
     write_csv_result,
     write_json_result,
 )
+from private_locations import load_private_locations, require_private_locations
 from routes_usage import RoutesUsageStore
 from transport_planner import plan_transport
 
@@ -52,16 +53,16 @@ def select_trip_places(all_places: list[dict], wanted_names: list[str]) -> list[
     return selected
 
 
-def collect_addresses(people: list[dict], places: list[dict]) -> list[str]:
-    addresses = []
+def collect_location_ids(people: list[dict], places: list[dict]) -> list[str]:
+    location_ids = []
 
     for person in people:
-        addresses.append(person["home_address"])
+        location_ids.append(person["home_location_id"])
 
     for place in places:
-        addresses.append(place["address"])
+        location_ids.append(place["location_id"])
 
-    return list(dict.fromkeys(addresses))
+    return list(dict.fromkeys(location_ids))
 
 
 def build_argument_parser():
@@ -115,6 +116,7 @@ def main():
 
     people = load_people("people.csv")
     all_places = load_places("places.csv")
+    private_locations = load_private_locations("private_locations.csv")
 
     trip_type = config["trip"]["type"]
     trip_place_names = config["trip"]["places"]
@@ -127,7 +129,11 @@ def main():
     if trip_type == "multiple_places" and len(places) < 2:
         raise ValueError("multiple_places trips must have two or more places.")
 
-    addresses = collect_addresses(people, places)
+    location_ids = collect_location_ids(people, places)
+    route_locations = require_private_locations(
+        location_ids,
+        private_locations,
+    )
 
     usage_store = RoutesUsageStore(
         config["settings"].get(
@@ -144,7 +150,7 @@ def main():
         ),
     )
 
-    duration_matrix = routes_client.compute_duration_matrix(addresses)
+    duration_matrix = routes_client.compute_duration_matrix(route_locations)
 
     result = plan_transport(
         people=people,

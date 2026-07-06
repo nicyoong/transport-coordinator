@@ -1,6 +1,6 @@
 import requests
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Mapping, Tuple
 
 from routes_usage import RoutesUsageStore
 
@@ -10,7 +10,7 @@ class GoogleRoutesClient:
     Small wrapper around Google Maps Routes API Compute Route Matrix.
 
     It returns a duration matrix:
-        duration_matrix[(origin_address, destination_address)] = seconds
+        duration_matrix[(origin_location_id, destination_location_id)] = seconds
     """
 
     ROUTE_MATRIX_URL = (
@@ -70,36 +70,39 @@ class GoogleRoutesClient:
             )
 
     @staticmethod
-    def _chunks(addresses: List[str], size: int) -> List[List[str]]:
+    def _chunks(
+        locations: List[Tuple[str, str]],
+        size: int,
+    ) -> List[List[Tuple[str, str]]]:
         return [
-            addresses[index:index + size]
-            for index in range(0, len(addresses), size)
+            locations[index:index + size]
+            for index in range(0, len(locations), size)
         ]
 
     def _compute_duration_matrix_batch(
         self,
-        origins_addresses: List[str],
-        destinations_addresses: List[str],
+        origins: List[Tuple[str, str]],
+        destinations: List[Tuple[str, str]],
         travel_mode: str = "DRIVE",
         routing_preference: str = "TRAFFIC_AWARE",
     ) -> Dict[Tuple[str, str], int]:
         self._validate_matrix_size(
-            origin_count=len(origins_addresses),
-            destination_count=len(destinations_addresses),
+            origin_count=len(origins),
+            destination_count=len(destinations),
         )
 
-        origins = [
+        origin_waypoints = [
             self._waypoint(address)
-            for address in origins_addresses
+            for _, address in origins
         ]
-        destinations = [
+        destination_waypoints = [
             self._waypoint(address)
-            for address in destinations_addresses
+            for _, address in destinations
         ]
 
         payload = {
-            "origins": origins,
-            "destinations": destinations,
+            "origins": origin_waypoints,
+            "destinations": destination_waypoints,
             "travelMode": travel_mode,
             "routingPreference": routing_preference,
         }
@@ -130,18 +133,18 @@ class GoogleRoutesClient:
             origin_index = element["originIndex"]
             destination_index = element["destinationIndex"]
 
-            origin = origins_addresses[origin_index]
-            destination = destinations_addresses[destination_index]
+            origin_id = origins[origin_index][0]
+            destination_id = destinations[destination_index][0]
 
-            if origin == destination:
-                duration_matrix[(origin, destination)] = 0
+            if origin_id == destination_id:
+                duration_matrix[(origin_id, destination_id)] = 0
                 continue
 
             if "duration" not in element:
-                duration_matrix[(origin, destination)] = 10**9
+                duration_matrix[(origin_id, destination_id)] = 10**9
                 continue
 
-            duration_matrix[(origin, destination)] = self._parse_duration(
+            duration_matrix[(origin_id, destination_id)] = self._parse_duration(
                 element["duration"]
             )
 
@@ -149,20 +152,22 @@ class GoogleRoutesClient:
 
     def compute_duration_matrix(
         self,
-        addresses: List[str],
+        locations: Mapping[str, str],
         travel_mode: str = "DRIVE",
         routing_preference: str = "TRAFFIC_AWARE",
     ) -> Dict[Tuple[str, str], int]:
         """
-        Computes pairwise travel duration between all unique addresses.
+        Computes pairwise travel duration between opaque location IDs.
 
         The complete matrix is split into safe API requests and merged so
-        transport assignment can still be optimized globally.
+        transport assignment can still be optimized globally. Raw addresses
+        are used only to construct the Google request payload and are never
+        used as matrix keys.
         """
 
-        unique_addresses = list(dict.fromkeys(addresses))
+        private_locations = list(locations.items())
         batches = self._chunks(
-            unique_addresses,
+            private_locations,
             self.MAX_ADDRESSES_PER_BATCH,
         )
         duration_matrix = {}
@@ -192,8 +197,8 @@ class GoogleRoutesClient:
             request_id = request_ids[index]
             try:
                 batch_matrix = self._compute_duration_matrix_batch(
-                    origins_addresses=origins_batch,
-                    destinations_addresses=destinations_batch,
+                    origins=origins_batch,
+                    destinations=destinations_batch,
                     travel_mode=travel_mode,
                     routing_preference=routing_preference,
                 )

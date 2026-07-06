@@ -13,17 +13,17 @@ from transport_planner import (
 )
 
 
-def fake_matrix(addresses):
+def fake_matrix(location_ids):
     """
-    Creates a fake duration matrix.
+    Creates a fake duration matrix keyed by opaque location ID.
 
     For basic tests, the duration between two different addresses is 10 minutes.
     Same address is 0 minutes.
     """
     matrix = {}
 
-    for a in addresses:
-        for b in addresses:
+    for a in location_ids:
+        for b in location_ids:
             if a == b:
                 matrix[(a, b)] = 0
             else:
@@ -38,56 +38,56 @@ def sample_people():
         {
             "name": "Sarah",
             "gender": "F",
-            "home_address": "Sarah home",
+            "home_location_id": "home:sarah",
             "can_drive": True,
             "car_capacity": 4,
         },
         {
             "name": "Maya",
             "gender": "F",
-            "home_address": "Maya home",
+            "home_location_id": "home:maya",
             "can_drive": True,
             "car_capacity": 2,
         },
         {
             "name": "Daniel",
             "gender": "M",
-            "home_address": "Daniel home",
+            "home_location_id": "home:daniel",
             "can_drive": True,
             "car_capacity": 4,
         },
         {
             "name": "Alice",
             "gender": "F",
-            "home_address": "Alice home",
+            "home_location_id": "home:alice",
             "can_drive": False,
             "car_capacity": 0,
         },
         {
             "name": "Bella",
             "gender": "F",
-            "home_address": "Bella home",
+            "home_location_id": "home:bella",
             "can_drive": False,
             "car_capacity": 0,
         },
         {
             "name": "Nina",
             "gender": "F",
-            "home_address": "Nina home",
+            "home_location_id": "home:nina",
             "can_drive": False,
             "car_capacity": 0,
         },
         {
             "name": "John",
             "gender": "M",
-            "home_address": "John home",
+            "home_location_id": "home:john",
             "can_drive": False,
             "car_capacity": 0,
         },
         {
             "name": "Mark",
             "gender": "M",
-            "home_address": "Mark home",
+            "home_location_id": "home:mark",
             "can_drive": False,
             "car_capacity": 0,
         },
@@ -99,11 +99,11 @@ def sample_places():
     return [
         {
             "name": "Lunch Restaurant",
-            "address": "Lunch address",
+            "location_id": "place:lunch",
         },
         {
             "name": "Mall",
-            "address": "Mall address",
+            "location_id": "place:mall",
         },
     ]
 
@@ -123,22 +123,22 @@ def sample_rules():
 
 @pytest.fixture
 def sample_duration_matrix(sample_people, sample_places):
-    addresses = []
+    location_ids = []
 
     for person in sample_people:
-        addresses.append(person["home_address"])
+        location_ids.append(person["home_location_id"])
 
     for place in sample_places:
-        addresses.append(place["address"])
+        location_ids.append(place["location_id"])
 
-    return fake_matrix(addresses)
+    return fake_matrix(location_ids)
 
 
 def test_route_duration_adds_each_leg(sample_duration_matrix):
     route = [
-        "Sarah home",
-        "Alice home",
-        "Lunch address",
+        "home:sarah",
+        "home:alice",
+        "place:lunch",
     ]
 
     result = route_duration(route, sample_duration_matrix)
@@ -148,27 +148,27 @@ def test_route_duration_adds_each_leg(sample_duration_matrix):
 
 def test_best_ordered_route_returns_start_stops_and_end(sample_duration_matrix):
     route, duration = best_ordered_route(
-        start="Sarah home",
-        stops=["Alice home", "Bella home"],
-        end="Lunch address",
+        start="home:sarah",
+        stops=["home:alice", "home:bella"],
+        end="place:lunch",
         duration_matrix=sample_duration_matrix,
     )
 
-    assert route[0] == "Sarah home"
-    assert route[-1] == "Lunch address"
-    assert set(route[1:-1]) == {"Alice home", "Bella home"}
+    assert route[0] == "home:sarah"
+    assert route[-1] == "place:lunch"
+    assert set(route[1:-1]) == {"home:alice", "home:bella"}
     assert duration == 1800
 
 
 def test_best_ordered_route_with_no_stops(sample_duration_matrix):
     route, duration = best_ordered_route(
-        start="Sarah home",
+        start="home:sarah",
         stops=[],
-        end="Lunch address",
+        end="place:lunch",
         duration_matrix=sample_duration_matrix,
     )
 
-    assert route == ["Sarah home", "Lunch address"]
+    assert route == ["home:sarah", "place:lunch"]
     assert duration == 600
 
 
@@ -218,11 +218,11 @@ def test_evaluate_single_place_trip(sample_people, sample_places, sample_duratio
     assert result["driver"] == "Sarah"
     assert result["passengers"] == ["Alice", "Bella"]
 
-    assert result["pickup_path"]["route"][0] == "Sarah home"
-    assert result["pickup_path"]["route"][-1] == "Lunch address"
+    assert result["pickup_path"]["route"][0] == "home:sarah"
+    assert result["pickup_path"]["route"][-1] == "place:lunch"
 
-    assert result["dropoff_path"]["route"][0] == "Lunch address"
-    assert result["dropoff_path"]["route"][-1] == "Sarah home"
+    assert result["dropoff_path"]["route"][0] == "place:lunch"
+    assert result["dropoff_path"]["route"][-1] == "home:sarah"
 
     # Pickup has 3 legs, dropoff has 3 legs.
     # Each leg is 10 minutes.
@@ -244,16 +244,16 @@ def test_evaluate_multiple_places_trip(sample_people, sample_places, sample_dura
     assert result["driver"] == "Sarah"
     assert result["passengers"] == ["Alice", "Bella"]
 
-    assert result["pickup_path"]["route"][0] == "Sarah home"
-    assert result["pickup_path"]["route"][-1] == "Lunch address"
+    assert result["pickup_path"]["route"][0] == "home:sarah"
+    assert result["pickup_path"]["route"][-1] == "place:lunch"
 
     assert result["place_to_place_path"]["route"] == [
-        "Lunch address",
-        "Mall address",
+        "place:lunch",
+        "place:mall",
     ]
 
-    assert result["dropoff_path"]["route"][0] == "Mall address"
-    assert result["dropoff_path"]["route"][-1] == "Sarah home"
+    assert result["dropoff_path"]["route"][0] == "place:mall"
+    assert result["dropoff_path"]["route"][-1] == "home:sarah"
 
     # Pickup: 3 legs = 30 min
     # Place-to-place: 1 leg = 10 min
@@ -372,7 +372,10 @@ def test_plan_transport_multiple_places(sample_people, sample_places, sample_rul
     )
 
     assert result["trip_type"] == "multiple_places"
-    assert result["places"] == sample_places
+    assert result["places"] == [
+        {"name": "Lunch Restaurant"},
+        {"name": "Mall"},
+    ]
 
     for car in result["cars"]:
         assert "pickup_path" in car

@@ -2,9 +2,9 @@ import csv
 from unittest.mock import Mock
 
 import pytest
+import requests
 
 from geocode_locations import (
-    collect_unique_addresses,
     geocode_addresses,
     load_existing_locations,
     write_locations,
@@ -14,35 +14,7 @@ from google_geocoding_client import (
     GoogleGeocodingClient,
 )
 
-
-def test_collect_unique_addresses_preserves_order_and_removes_duplicates(
-    tmp_path,
-):
-    people_path = tmp_path / "people.csv"
-    places_path = tmp_path / "places.csv"
-    people_path.write_text(
-        "name,home_address\n"
-        "Driver,Shared address\n"
-        "Passenger,Passenger address\n",
-        encoding="utf-8",
-    )
-    places_path.write_text(
-        "name,address\n"
-        "Shared place,Shared address\n"
-        "Destination,Destination address\n",
-        encoding="utf-8",
-    )
-
-    addresses = collect_unique_addresses(people_path, places_path)
-
-    assert addresses == [
-        "Shared address",
-        "Passenger address",
-        "Destination address",
-    ]
-
-
-def test_google_geocoding_client_returns_normalized_first_result(
+def test_google_geocoding_client_returns_address_free_audit(
     monkeypatch,
 ):
     response = Mock()
@@ -67,18 +39,18 @@ def test_google_geocoding_client_returns_normalized_first_result(
     get = Mock(return_value=response)
     monkeypatch.setattr("google_geocoding_client.requests.get", get)
 
-    result = GoogleGeocodingClient("test-key").geocode("Beta KL")
+    result = GoogleGeocodingClient("test-key").geocode(
+        "place:beta",
+        "Beta KL",
+    )
 
     assert result == {
-        "address": "Beta KL",
-        "formatted_address": "Beta KL, Kuala Lumpur, Malaysia",
-        "latitude": 3.153,
-        "longitude": 101.711,
-        "place_id": "test-place-id",
+        "location_id": "place:beta",
         "location_type": "ROOFTOP",
         "partial_match": True,
     }
     assert get.call_args.kwargs["params"]["region"] == "my"
+    assert get.call_args.kwargs["params"]["address"] == "Beta KL"
 
 
 def test_google_geocoding_client_raises_for_unsuccessful_status(
@@ -95,26 +67,53 @@ def test_google_geocoding_client_raises_for_unsuccessful_status(
         Mock(return_value=response),
     )
 
-    with pytest.raises(
-        GeocodingError,
-        match="Geocoding API is not enabled",
-    ):
-        GoogleGeocodingClient("test-key").geocode("Beta KL")
+    with pytest.raises(GeocodingError) as error:
+        GoogleGeocodingClient("test-key").geocode(
+            "place:beta",
+            "Private Beta Address",
+        )
+
+    assert "REQUEST_DENIED" in str(error.value)
+    assert "place:beta" in str(error.value)
+    assert "Private Beta Address" not in str(error.value)
+
+
+def test_google_geocoding_client_hides_address_and_key_in_http_errors(
+    monkeypatch,
+):
+    response = Mock()
+    response.raise_for_status.side_effect = requests.HTTPError(
+        "Failed URL contains Private Address and secret-key"
+    )
+    monkeypatch.setattr(
+        "google_geocoding_client.requests.get",
+        Mock(return_value=response),
+    )
+
+    with pytest.raises(GeocodingError) as error:
+        GoogleGeocodingClient("secret-key").geocode(
+            "home:private",
+            "Private Address",
+        )
+
+    message = str(error.value)
+    assert "home:private" in message
+    assert "Private Address" not in message
+    assert "secret-key" not in message
 
 
 def test_geocode_addresses_reuses_complete_existing_locations():
     existing_location = {
-        "address": "Cached address",
-        "latitude": "3.1",
-        "longitude": "101.7",
-        "place_id": "cached-place-id",
+        "location_id": "home:cached",
+        "location_type": "ROOFTOP",
+        "partial_match": "False",
     }
     client = Mock()
 
     locations = geocode_addresses(
-        addresses=["Cached address"],
+        private_locations={"home:cached": "Cached address"},
         client=client,
-        existing={"Cached address": existing_location},
+        existing={"home:cached": existing_location},
         delay_seconds=0,
     )
 
@@ -124,16 +123,15 @@ def test_geocode_addresses_reuses_complete_existing_locations():
 
 def test_geocode_addresses_fetches_missing_locations():
     fetched_location = {
-        "address": "New address",
-        "latitude": 3.2,
-        "longitude": 101.8,
-        "place_id": "new-place-id",
+        "location_id": "home:new",
+        "location_type": "ROOFTOP",
+        "partial_match": False,
     }
     client = Mock()
     client.geocode.return_value = fetched_location
 
     locations = geocode_addresses(
-        addresses=["New address"],
+        private_locations={"home:new": "New address"},
         client=client,
         existing={},
         delay_seconds=0,
@@ -141,6 +139,7 @@ def test_geocode_addresses_fetches_missing_locations():
 
     assert locations == [fetched_location]
     client.geocode.assert_called_once_with(
+        "home:new",
         "New address",
         region_code="my",
     )
@@ -149,11 +148,7 @@ def test_geocode_addresses_fetches_missing_locations():
 def test_write_and_load_locations_round_trip(tmp_path):
     output_path = tmp_path / "locations.csv"
     location = {
-        "address": "Beta KL",
-        "formatted_address": "Beta KL, Kuala Lumpur, Malaysia",
-        "latitude": 3.153,
-        "longitude": 101.711,
-        "place_id": "test-place-id",
+        "location_id": "place:beta",
         "location_type": "ROOFTOP",
         "partial_match": False,
     }
@@ -161,11 +156,10 @@ def test_write_and_load_locations_round_trip(tmp_path):
     write_locations(output_path, [location])
     loaded = load_existing_locations(output_path)
 
-    assert loaded["Beta KL"]["latitude"] == "3.153"
-    assert loaded["Beta KL"]["longitude"] == "101.711"
-    assert loaded["Beta KL"]["place_id"] == "test-place-id"
+    assert loaded["place:beta"]["location_type"] == "ROOFTOP"
 
     with output_path.open(encoding="utf-8", newline="") as file:
         rows = list(csv.DictReader(file))
 
     assert rows[0]["partial_match"] == "False"
+    assert "address" not in rows[0]

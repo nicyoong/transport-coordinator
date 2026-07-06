@@ -3,47 +3,19 @@ import csv
 import os
 import time
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Mapping
 
 from dotenv import load_dotenv
 
 from google_geocoding_client import GoogleGeocodingClient
+from private_locations import load_private_locations
 
 
 LOCATION_FIELDS = [
-    "address",
-    "formatted_address",
-    "latitude",
-    "longitude",
-    "place_id",
+    "location_id",
     "location_type",
     "partial_match",
 ]
-
-
-def read_address_column(path: Path, column: str) -> List[str]:
-    with path.open("r", encoding="utf-8-sig", newline="") as file:
-        reader = csv.DictReader(file)
-
-        if not reader.fieldnames or column not in reader.fieldnames:
-            raise ValueError(f"{path} does not contain a {column!r} column.")
-
-        return [
-            row[column].strip()
-            for row in reader
-            if row.get(column) and row[column].strip()
-        ]
-
-
-def collect_unique_addresses(
-    people_path: Path,
-    places_path: Path,
-) -> List[str]:
-    addresses = [
-        *read_address_column(people_path, "home_address"),
-        *read_address_column(places_path, "address"),
-    ]
-    return list(dict.fromkeys(addresses))
 
 
 def load_existing_locations(path: Path) -> Dict[str, dict]:
@@ -52,21 +24,21 @@ def load_existing_locations(path: Path) -> Dict[str, dict]:
 
     with path.open("r", encoding="utf-8-sig", newline="") as file:
         return {
-            row["address"]: row
+            row["location_id"]: row
             for row in csv.DictReader(file)
-            if row.get("address")
+            if row.get("location_id")
         }
 
 
 def location_is_complete(location: dict) -> bool:
     return all(
         location.get(field) not in (None, "")
-        for field in ("latitude", "longitude", "place_id")
+        for field in ("location_type", "partial_match")
     )
 
 
 def geocode_addresses(
-    addresses: Iterable[str],
+    private_locations: Mapping[str, str],
     client: GoogleGeocodingClient,
     existing: Dict[str, dict],
     region_code: str = "my",
@@ -75,14 +47,20 @@ def geocode_addresses(
 ) -> List[dict]:
     locations = []
 
-    for address in addresses:
-        cached = existing.get(address)
+    for location_id, address in private_locations.items():
+        cached = existing.get(location_id)
 
         if not refresh and cached and location_is_complete(cached):
             locations.append(cached)
             continue
 
-        locations.append(client.geocode(address, region_code=region_code))
+        locations.append(
+            client.geocode(
+                location_id,
+                address,
+                region_code=region_code,
+            )
+        )
 
         if delay_seconds > 0:
             time.sleep(delay_seconds)
@@ -115,15 +93,18 @@ def write_locations(path: Path, locations: Iterable[dict]) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Geocode unique people and place addresses into locations.csv."
+            "Privately geocode locations and write an address-free audit."
         )
     )
-    parser.add_argument("--people", type=Path, default=Path("people.csv"))
-    parser.add_argument("--places", type=Path, default=Path("places.csv"))
+    parser.add_argument(
+        "--private-locations",
+        type=Path,
+        default=Path("private_locations.csv"),
+    )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("locations.csv"),
+        default=Path("location_audit.csv"),
     )
     parser.add_argument(
         "--region",
@@ -152,11 +133,11 @@ def main() -> None:
     if not api_key:
         raise ValueError("Missing GOOGLE_MAPS_API_KEY in .env file.")
 
-    addresses = collect_unique_addresses(args.people, args.places)
+    private_locations = load_private_locations(args.private_locations)
     existing = load_existing_locations(args.output)
     client = GoogleGeocodingClient(api_key)
     locations = geocode_addresses(
-        addresses=addresses,
+        private_locations=private_locations,
         client=client,
         existing=existing,
         region_code=args.region,
@@ -168,9 +149,9 @@ def main() -> None:
     geocoded_count = sum(
         1
         for location in locations
-        if location["address"] not in existing
+        if location["location_id"] not in existing
         or args.refresh
-        or not location_is_complete(existing[location["address"]])
+        or not location_is_complete(existing[location["location_id"]])
     )
     print(
         f"Wrote {len(locations)} unique locations to {args.output} "

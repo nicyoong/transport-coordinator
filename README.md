@@ -138,12 +138,12 @@ Add `.env` to `.gitignore`:
 This file contains all drivers and passengers.
 
 ```csv
-name,gender,home_address,can_drive,car_capacity
-Olivia,F,"Beta KL, Cormar Suites, No. 10, Jalan Perak, 50450 Kuala Lumpur",true,4
-Emma,F,"Yun House, Four Seasons Hotel Kuala Lumpur, 145 Jalan Ampang, 50450 Kuala Lumpur",true,4
-Sophia,F,"Shang Palace, Shangri-La Kuala Lumpur, 11 Jalan Sultan Ismail, 50250 Kuala Lumpur",true,3
-Charlotte,F,"FLOCK, W Kuala Lumpur, 121 Jalan Ampang, 50450 Kuala Lumpur",false,0
-Amelia,F,"Curate, Four Seasons Hotel Kuala Lumpur, 145 Jalan Ampang, 50450 Kuala Lumpur",false,0
+name,gender,home_location_id,can_drive,car_capacity
+Olivia,F,loc_001,true,4
+Emma,F,loc_004,true,4
+Sophia,F,loc_005,true,3
+Charlotte,F,loc_002,false,0
+Amelia,F,loc_006,false,0
 ```
 
 Fields:
@@ -152,7 +152,7 @@ Fields:
 | -------------- | ------------------------------------------ |
 | `name`         | Person's name                              |
 | `gender`       | Used for same-gender grouping rules        |
-| `home_address` | Pickup/drop-off address                    |
+| `home_location_id` | Opaque reference into `private_locations.csv` |
 | `can_drive`    | `true` for drivers, `false` for passengers |
 | `car_capacity` | Number of passengers the driver can take   |
 
@@ -169,13 +169,10 @@ Important:
 This file contains possible destination places.
 
 ```csv
-name,address
-Beta KL,"Beta KL, Cormar Suites, No. 10, Jalan Perak, 50450 Kuala Lumpur"
-Yun House,"Yun House, Four Seasons Hotel Kuala Lumpur, 145 Jalan Ampang, 50450 Kuala Lumpur"
-FLOCK W Kuala Lumpur,"FLOCK, W Kuala Lumpur, 121 Jalan Ampang, 50450 Kuala Lumpur"
-Tatsu Japanese Cuisine,"Tatsu Japanese Cuisine, InterContinental Kuala Lumpur, 165 Jalan Ampang, 50450 Kuala Lumpur"
-Village Park Restaurant,"Village Park Restaurant, 5 Jalan SS 21/37, Damansara Utama, 47400 Petaling Jaya"
-Strangers at 47,"Strangers at 47, 45 Jalan 17/45, Seksyen 17, 46400 Petaling Jaya"
+name,location_id
+Beta KL,loc_003
+Yun House,loc_007
+FLOCK W Kuala Lumpur,loc_008
 ```
 
 Fields:
@@ -183,7 +180,22 @@ Fields:
 | Field     | Meaning                                |
 | --------- | -------------------------------------- |
 | `name`    | Short name used in `config.yml`        |
-| `address` | Full address sent to Google Routes API |
+| `location_id` | Opaque reference into `private_locations.csv` |
+
+### `private_locations.csv`
+
+This is the only planner input containing raw addresses:
+
+```csv
+location_id,address
+loc_001,"Full private driver address"
+loc_002,"Full private passenger address"
+loc_003,"Full destination address"
+```
+
+Copy `private_locations.csv.sample`, replace its sample records, and restrict
+access to the resulting file. CSV files are excluded from Git. Location IDs
+must be unique and should not contain address information.
 
 ---
 
@@ -323,7 +335,7 @@ Pickup and drop-off modes optimize driver assignments using only the selected
 duty's travel time and print only that route. Both mode uses the combined
 travel time. The terminal report shows only each car, driver, passenger order,
 total estimated driving time, unused drivers, unassigned passengers, and
-notes. Addresses and API usage remain in the raw JSON.
+notes. API usage remains in JSON, but raw addresses do not.
 
 The complete raw result is written to `transport_plan_pickup.json`,
 `transport_plan_dropoff.json`, or `transport_plan_both.json`. Separate files
@@ -380,23 +392,24 @@ Enable the **Geocoding API** in the same Google Cloud project used for the
 Routes API. The existing `GOOGLE_MAPS_API_KEY` can be used if its API
 restrictions allow both APIs.
 
-Generate coordinates and Place IDs for the unique addresses in `people.csv`
-and `places.csv`:
+Audit the locations in the restricted `private_locations.csv`:
 
 ```bash
 python geocode_locations.py
 ```
 
-This writes `locations.csv`. Existing complete rows are reused, so subsequent
-runs only request new or incomplete addresses. To geocode every address again:
+This writes `location_audit.csv`, containing only location IDs, location type,
+and partial-match status. It contains no address, normalized address,
+coordinates, or Place ID. Existing complete rows are reused, so subsequent
+runs only request new or incomplete locations. To geocode every location again:
 
 ```bash
 python geocode_locations.py --refresh
 ```
 
 Review rows where `partial_match` is `True` or where `location_type` is less
-precise than expected. The API key is read from `.env` and is never written to
-the output.
+precise than expected. The API key and addresses are never written to the
+audit output. Geocoding failures identify only the opaque location ID.
 
 Example output:
 
@@ -412,8 +425,7 @@ Example output:
   },
   "places": [
     {
-      "name": "Beta KL",
-      "address": "Beta KL, Cormar Suites, No. 10, Jalan Perak, 50450 Kuala Lumpur"
+      "name": "Beta KL"
     }
   ],
   "cars": [
@@ -423,20 +435,20 @@ Example output:
       "pickup_path": {
         "description": "Driver home to passenger homes to place",
         "route": [
-          "Beta KL, Cormar Suites, No. 10, Jalan Perak, 50450 Kuala Lumpur",
-          "FLOCK, W Kuala Lumpur, 121 Jalan Ampang, 50450 Kuala Lumpur",
-          "Curate, Four Seasons Hotel Kuala Lumpur, 145 Jalan Ampang, 50450 Kuala Lumpur",
-          "Beta KL, Cormar Suites, No. 10, Jalan Perak, 50450 Kuala Lumpur"
+          "loc_001",
+          "loc_002",
+          "loc_006",
+          "loc_003"
         ],
         "estimated_duration_min": 22
       },
       "dropoff_path": {
         "description": "Place to passenger homes to driver home",
         "route": [
-          "Beta KL, Cormar Suites, No. 10, Jalan Perak, 50450 Kuala Lumpur",
-          "Curate, Four Seasons Hotel Kuala Lumpur, 145 Jalan Ampang, 50450 Kuala Lumpur",
-          "FLOCK, W Kuala Lumpur, 121 Jalan Ampang, 50450 Kuala Lumpur",
-          "Beta KL, Cormar Suites, No. 10, Jalan Perak, 50450 Kuala Lumpur"
+          "loc_003",
+          "loc_006",
+          "loc_002",
+          "loc_001"
         ],
         "estimated_duration_min": 24
       },
@@ -493,19 +505,21 @@ The system separates the problem into two parts.
 
 ### 1. Routing data
 
-`google_routes_client.py` asks Google Routes API for travel duration between every pair of addresses.
+`google_routes_client.py` resolves opaque location IDs to addresses only while
+building the Google Routes request. Google receives the required addresses,
+but the returned matrix and the rest of the application use IDs.
 
 This creates a duration matrix:
 
 ```python
-duration_matrix[(origin_address, destination_address)] = seconds
+duration_matrix[(origin_location_id, destination_location_id)] = seconds
 ```
 
 Example:
 
 ```python
 duration_matrix[
-    ("Olivia home", "Charlotte home")
+    ("loc_001", "loc_002")
 ] = 600
 ```
 
@@ -581,7 +595,7 @@ Possible next steps:
 * export results to CSV
 * export results to Google Sheets
 * generate WhatsApp-friendly messages
-* add real geocoding for partial addresses
+* add a private workflow for investigating partial geocoding matches
 * add route links to Google Maps
 * allow pickup-only or drop-off-only trips
 * add time windows
